@@ -1,4 +1,4 @@
-name: Joint Level DBQ Report Publisher
+name: Joint Level DBQ Report Publisher v2
 
 on:
   workflow_dispatch:
