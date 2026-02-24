@@ -1,0 +1,15 @@
+requests>=2.31.0
+urllib3<2.0
+pandas>=2.2.0
+matplotlib>=3.8.0
+scikit-learn>=1.4.0
+numpy>=1.26.0
+rapidfuzz>=3.9.0
+python-dateutil>=2.9.0
+XlsxWriter>=3.2.0
+
+PyYAML>=6.0.0
+google-api-python-client>=2.164.0
+google-auth>=2.38.0
+google-auth-oauthlib>=1.2.1
+google-cloud-bigquery>=3.33.0
