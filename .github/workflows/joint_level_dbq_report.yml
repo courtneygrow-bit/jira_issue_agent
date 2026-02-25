@@ -71,6 +71,7 @@ jobs:
           JIRA_URL: ${{ vars.JIRA_URL }}
           CONFLUENCE_BASE_URL: ${{ vars.CONFLUENCE_BASE_URL }}
           JOINT_LEVEL_DBQ_PAGE_ID: ${{ vars.JOINT_LEVEL_DBQ_PAGE_ID }}
+          JIRA_IMPACTED_SYSTEM_FIELD_ID: ${{ vars.JIRA_IMPACTED_SYSTEM_FIELD_ID }}
           CONFLUENCE_JIRA_SERVER_NAME: ${{ vars.CONFLUENCE_JIRA_SERVER_NAME }}
           CONFLUENCE_JIRA_SERVER_ID: ${{ vars.CONFLUENCE_JIRA_SERVER_ID }}
         shell: bash
@@ -90,6 +91,9 @@ jobs:
             --fetch-retries 8
             --retry-backoff-sec 3
           )
+          if [[ -n "${JIRA_IMPACTED_SYSTEM_FIELD_ID:-}" ]]; then
+            ARGS+=(--impacted-system-field-id "$JIRA_IMPACTED_SYSTEM_FIELD_ID")
+          fi
           if [[ -n "${CONFLUENCE_JIRA_SERVER_NAME:-}" ]]; then
             ARGS+=(--jira-server-name "$CONFLUENCE_JIRA_SERVER_NAME")
           fi

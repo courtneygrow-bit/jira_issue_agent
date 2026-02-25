@@ -27,6 +27,7 @@ from run_weekly_design_report import (
     build_auth_headers,
     categorize_issue_dashboard,
     compute_previous_week_window,
+    discover_impacted_robot_system_field_id,
     fetch_issues,
     is_terminal_status,
     parse_jira_url,
@@ -330,17 +331,20 @@ def two_chart_row(left_filename: str, right_filename: str) -> str:
     )
 
 
-def open_issue_jql(project_key: str, open_issues: Sequence[JiraIssue]) -> str:
-    keys = []
-    seen = set()
-    for issue in open_issues:
-        key = str(issue.key or "").strip().upper()
-        if key and key not in seen:
-            seen.add(key)
-            keys.append(key)
-    if not keys:
-        return f"project = {project_key} AND statusCategory != Done AND issuekey is EMPTY"
-    return f"issuekey in ({', '.join(keys)}) ORDER BY priority DESC, created DESC"
+def jql_escape(value: str) -> str:
+    return value.replace('"', '\\"')
+
+
+def open_issue_jql(project_key: str, system: str) -> str:
+    if system == "Unspecified":
+        return (
+            f"project = {project_key} AND statusCategory != Done "
+            'AND "Impacted Robot System" is EMPTY ORDER BY priority DESC, created DESC'
+        )
+    return (
+        f"project = {project_key} AND statusCategory != Done "
+        f'AND "Impacted Robot System" = "{jql_escape(system)}" ORDER BY priority DESC, created DESC'
+    )
 
 
 def jira_sheet_macro(
@@ -492,6 +496,7 @@ def fetch_issues_with_retry(
     timeout_sec: int,
     fetch_retries: int,
     retry_backoff_sec: float,
+    impacted_system_field_id: Optional[str],
 ) -> List[JiraIssue]:
     retries = max(1, int(fetch_retries))
     for attempt in range(1, retries + 1):
@@ -503,6 +508,7 @@ def fetch_issues_with_retry(
                 jql=jql,
                 max_issues=max_issues,
                 timeout_sec=timeout_sec,
+                impacted_system_field_id_override=impacted_system_field_id,
             )
         except RETRYABLE_FETCH_ERRORS as exc:
             if attempt >= retries:
@@ -559,6 +565,31 @@ def run(args: argparse.Namespace) -> None:
     if not project_key:
         project_key = "DQB"
 
+    impacted_field_id = str(args.impacted_system_field_id or "").strip()
+    if not impacted_field_id:
+        headers = build_auth_headers(jira_email, jira_api_token)
+        for attempt in range(1, args.fetch_retries + 1):
+            try:
+                impacted_field_id = (
+                    discover_impacted_robot_system_field_id(base_url, headers, args.timeout_sec) or ""
+                ).strip()
+                if impacted_field_id:
+                    break
+            except RETRYABLE_FETCH_ERRORS:
+                pass
+            if attempt < args.fetch_retries:
+                delay = float(args.retry_backoff_sec) * attempt
+                print(
+                    f"Impacted Robot System field discovery failed (attempt {attempt}/{args.fetch_retries}); "
+                    f"retrying in {delay:.1f}s..."
+                )
+                time.sleep(delay)
+    if not impacted_field_id:
+        raise ValueError(
+            "Unable to discover Jira custom field id for 'Impacted Robot System'. "
+            "Set --impacted-system-field-id (or env JIRA_IMPACTED_SYSTEM_FIELD_ID) and rerun."
+        )
+
     jql = args.jql.strip() or f"project = {project_key} ORDER BY created DESC"
     all_issues = fetch_issues_with_retry(
         base_url=base_url,
@@ -569,6 +600,7 @@ def run(args: argparse.Namespace) -> None:
         timeout_sec=args.timeout_sec,
         fetch_retries=args.fetch_retries,
         retry_backoff_sec=args.retry_backoff_sec,
+        impacted_system_field_id=impacted_field_id,
     )
 
     system_to_all_issues: Dict[str, List[JiraIssue]] = defaultdict(list)
@@ -634,7 +666,7 @@ def run(args: argparse.Namespace) -> None:
         generate_trend_chart(system, all_system_issues, week_end, args.timezone, trend_path)
         generate_category_pareto_chart(system, open_system_issues, pareto_path)
 
-        system_jql = open_issue_jql(project_key, open_system_issues)
+        system_jql = open_issue_jql(project_key, system)
         jql_url = f"{base_url}/issues/?jql={quote(system_jql)}"
 
         md_lines.extend(
@@ -698,6 +730,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--timeout-sec", type=int, default=60)
     p.add_argument("--fetch-retries", type=int, default=5)
     p.add_argument("--retry-backoff-sec", type=float, default=2.0)
+    p.add_argument("--impacted-system-field-id", default=os.getenv("JIRA_IMPACTED_SYSTEM_FIELD_ID", ""))
     p.add_argument("--timezone", default=os.getenv("REPORT_TIMEZONE", "America/Los_Angeles"))
     p.add_argument("--output-dir", default="output")
     p.add_argument("--publish-confluence", action="store_true")

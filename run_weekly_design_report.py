@@ -477,6 +477,7 @@ def fetch_issues(
     jql: str,
     max_issues: int,
     timeout_sec: int,
+    impacted_system_field_id_override: Optional[str] = None,
 ) -> List[JiraIssue]:
     headers = build_auth_headers(jira_email, jira_api_token)
     search_url_new = f"{base_url}/rest/api/3/search/jql"
@@ -487,11 +488,14 @@ def fetch_issues(
     next_page_token: Optional[str] = None
     issues: List[JiraIssue] = []
 
-    impacted_system_field_id: Optional[str] = None
-    try:
-        impacted_system_field_id = discover_impacted_robot_system_field_id(base_url, headers, timeout_sec)
-    except Exception:
-        impacted_system_field_id = None
+    impacted_system_field_id: Optional[str] = (
+        str(impacted_system_field_id_override or "").strip() or None
+    )
+    if not impacted_system_field_id:
+        try:
+            impacted_system_field_id = discover_impacted_robot_system_field_id(base_url, headers, timeout_sec)
+        except Exception:
+            impacted_system_field_id = None
 
     base_fields = [
         "summary",

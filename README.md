@@ -366,6 +366,7 @@ Optional GitHub repository variables:
 - `CONFLUENCE_BASE_URL` (default: `https://halodi.atlassian.net/wiki`)
 - `JOINT_LEVEL_DBQ_PAGE_ID` (default: `5691277356`)
 - `JIRA_URL` (default: DQB project list URL)
+- `JIRA_IMPACTED_SYSTEM_FIELD_ID` (recommended fallback for hosted runs if field auto-discovery is unreliable)
 - `CONFLUENCE_JIRA_SERVER_NAME`
 - `CONFLUENCE_JIRA_SERVER_ID`
 
